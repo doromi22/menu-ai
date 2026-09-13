@@ -1,53 +1,76 @@
-# MenuAI - Web アプリ
+# MenuAI Web アプリ
 
-MenuAI の加盟店向け Web アプリです。飲食店が料理の写真をアップロードすると、背景を整えたメニュー用画像が返ってきます。
-このリポジトリは Laravel 側（アカウント、クレジット、アップロード、キュー、ステータス確認）です。セグメンテーション・合成・整合性検証といった画像処理本体は別リポジトリ [`menu-ai-service`](https://github.com/doromi22/menu-ai-service) にあり、エンジンの設計、実写真で見つかった問題、修正前後の比較画像はそちらの README にまとめています。
+飲食店の方が料理の写真をアップロードすると、背景をきれいに整えたメニュー用の画像ができあがる Web アプリです。
 
-## 設計: Action-Domain-Responder（ADR）
+MenuAI は 2 つのリポジトリでできています。
 
-HTTP 層は MVC のコントローラではなく ADR パターンで構成しています。エンドポイント 1 つにつき Action 1 つで、責務を 3 層に分けています。
+| リポジトリ | 役割 |
+|---|---|
+| **menu-ai**（ここ） | お店の人が使う Web アプリ（Laravel）。ログイン、クレジット、写真のアップロード、処理状況の確認を担当します |
+| [menu-ai-service](https://github.com/doromi22/menu-ai-service) | 写真から料理を切り抜いて合成する AI サービス（Python）。処理の中身や、実際の写真で見つかった問題と直し方は、こちらの README にまとめています |
+
+## 全体の流れ
+
+![アップロードの流れ: リクエストは Action → Domain → Responder、処理はキューワーカー → AI サービス → 結果の保存。ブラウザは 1 秒ごとに状況を確認](docs/images/architecture.svg)
+
+写真を 1 枚アップロードしたときの流れです。
+
+1. **受付**: ブラウザから `POST /api/images/upload` が届くと、`UploadImageAction` が入力をチェックします。
+2. **業務処理**: `Domain\Image\UploadImage` がクレジットを 1 つ使い、元の写真を保存して、処理を「キュー」に登録します。
+3. **応答**: `UploadImageResponder` が、受け付けたことをすぐにブラウザへ返します（201）。画像の処理はまだ終わっていません。
+4. **裏側での処理**: キューワーカーが順番に仕事を取り出し、`menu-ai-service` に画像の処理を依頼して、結果を保存します。
+5. **状況の確認**: ブラウザは `GET /api/images/{id}/status` を 1 秒ごとに呼び、処理が終わったかを確認します。
+
+画像の処理には 10 秒前後かかるため、アップロードのリクエストの中では処理せず、キューで後から処理しています。
+
+## コードの設計: Action-Domain-Responder（ADR）
+
+画面からのリクエストを処理する部分は、MVC のコントローラーではなく **ADR パターン**で書いています。
+1 つの API に対して 1 つの Action クラスがあり、処理を次の 3 つに分けています。
+
+| 役割 | 担当すること | 場所 |
+|---|---|---|
+| **Action** | リクエストを受け取って入力をチェックし、Domain を呼んで、結果を Responder に渡す | `app/Http/Actions/` |
+| **Domain** | アプリのルール（クレジットの使い方、登録の条件など） | `app/Domain/` |
+| **Responder** | ブラウザに返す JSON の形を組み立てる | `app/Http/Responders/` |
+
+コントローラーに全部を書くと、「入力チェック」「ルール」「返す形」が 1 か所に混ざり、ルールだけをテストしたり直したりしにくくなります。
+ADR では役割ごとにファイルが分かれているので、たとえば「クレジットの使い方」を変えたいときは `app/Domain/Image/UploadImage.php` だけを見れば済みます。Domain はリクエストや JSON を扱わないので、HTTP を通さずにテストすることもできます（例: `tests/Unit/ProcessingOutcomeTest.php`）。
 
 ```
 app/
   Http/
-    Actions/        HTTP の入力だけを扱う（バリデーション、認証状態、ルートモデル）。業務ロジックは持たない
-    Responders/     JSON レスポンスの組み立てだけを扱う。ユーザー・画像の形は Payloads/ に集約
+    Actions/        API ごとの入口（入力のチェックだけ）
+    Responders/     JSON の組み立て。ユーザーと画像の JSON の形は Payloads/ に集約
   Domain/
-    Auth/           RegisterUser: 使い捨てメールの拒否、無料クレジットの付与条件（不正登録対策）
-    Image/          UploadImage: クレジット消費・原本保存・処理エンジンへの投入
-                    ListUserImages / ProcessingOutcome: 処理結果が加盟店にとって何を意味するか
-  Services/         StandardAiService: ai-service への HTTP 呼び出しと結果の保存（インフラ）
-  Jobs/             ProcessStandardImageJob（既定）/ ProcessImageJob（Premium）
+    Auth/           RegisterUser: 使い捨てメールの拒否、無料クレジットを付ける条件
+    Image/          UploadImage: クレジットを使い、写真を保存し、処理を登録する
+                    ListUserImages: 自分の画像の一覧
+                    ProcessingOutcome: 処理結果をお店の人向けの言葉に変える
+  Services/         StandardAiService: menu-ai-service への通信と、結果の保存
+  Jobs/             ProcessStandardImageJob（通常）/ ProcessImageJob（Premium）
 ```
 
-例えばアップロードでは、`UploadImageAction` がリクエストを検証し、`Domain\Image\UploadImage` がクレジットを消費してジョブを投入し、`UploadImageResponder` がレスポンスを返します。
-Domain は `Request` オブジェクトもレスポンスの形も扱わないため、業務ルールを HTTP を経由せずに呼び出してテストできます（例: `tests/Unit/ProcessingOutcomeTest.php`）。
+この構成に作り直す前に、今の API の動き（ステータスコードや JSON の形）を固定するテストを先に書きました。作り直したあとも同じテストがすべて通ることを確認しています。
 
-リファクタリングの前に、既存エンドポイントのステータスコードと JSON の形を固定する characterization テストを先に追加し、構造変更の後も同じテストが通ることを確認しています。
+## 気をつけているポイント
 
-## アップロードの流れ
+- **クレジットがマイナスにならない**: 「残りが 1 以上なら 1 減らす」を 1 回のデータベース更新で行っています。同じ人が同時に 2 回アップロードしても、残高がマイナスになることはありません。
+- **失敗したらクレジットを戻す**: 使える画像ができなかったとき（REJECT、サーバー側の障害、AI サービスにつながらない）は、処理状態を `failed` にしてクレジットを 1 つ戻します。REVIEW は画像ができているので戻しません。
+- **結果の記録**: どの基準で判定したか（基準値のハッシュ）、各段階の判定（PASS / REVIEW / REJECT）、サーバー側の障害かどうか、再実行した回数を `images` テーブルに保存します。判定の理由コードは `image_processing_reasons` テーブルに 1 件ずつ保存するので、「どの理由の REVIEW が多いか」を集計できます。
+- **わかりやすいメッセージ**: 状況確認の API は、確認が必要かどうか（`review_required`）と、お店の人向けの日本語メッセージを返します。サーバー側の障害のときは、「この写真には対応していません」ではなく「一時的なエラー」と伝えるようにしています。
+- **設定の切り替え**: `config/services.php` の `image_processing` で、処理に使うエンジン（通常は `standard`、`premium` にすると以前の画像生成 AI 方式）と、画面で選ぶ背景と AI サービス側のテンプレートの対応を設定します。
 
-![アップロードの流れ: リクエストは Action → Domain → Responder、処理はキューワーカー → AI サービス → 結果保存。ブラウザは 1 秒ごとにステータスを確認](docs/images/architecture.svg)
+## ローカルで動かす
 
-1. `POST /api/images/upload` を `UploadImageAction` が受け、`Domain\Image\UploadImage` がクレジットを 1 消費して原本を保存し、`ProcessStandardImageJob` を投入します。`UploadImageResponder` が 201 を返します。
-2. キューワーカーが `menu-ai-service` の `POST /v1/standard/process` を呼び、メタデータ・理由コード・処理済み画像を保存します。
-3. ブラウザは `GET /api/images/{id}/status` を 1 秒ごとに確認します。
-
-- **クレジット消費**は「残高 1 以上なら減らす」を 1 つの UPDATE で行うため、同時に 2 件アップロードしても残高がマイナスになりません。
-- **返却ルール**: REVIEW は画像が返るため返却しません。
-- **保存するメタデータ**: ポリシーハッシュ、段階ごとの PASS/REVIEW/REJECT、`is_infra_error`、再試行回数を `images` に保存し、理由コードは 1 コード 1 行で `image_processing_reasons` に保存します。これにより、REVIEW がどの理由で多いかを集計できます。
-- **ステータス API** は `review_required` と、加盟店向けの日本語メッセージ（`Domain\Image\ProcessingOutcome`）を返します。インフラ障害は必ず「一時的なエラー」として扱い、「この写真には対応していません」と誤って伝えないようにしています。
-- **`config/services.php`** の `image_processing` で、アップロード先のエンジン（既定は `standard`、`premium` は Modal 上の旧生成モデル方式）と、画面のプリセットとテンプレートの対応を設定します。
-
-## ローカルでの実行
-
-PHP 8.3 以上、Composer、ポート 8002 で動いている AI サービスが必要です。AI サービスはこのリポジトリの隣に `ai-service` という名前で配置します（エンドツーエンドテストがこのパスを参照します）。
+**必要なもの**: PHP 8.3 以上、Composer、そしてポート 8002 で動いている AI サービス。
+AI サービスは、このリポジトリと同じ階層に `ai-service` という名前で置いてください（テストがこの場所を使います）。
 
 ```bash
 git clone https://github.com/doromi22/menu-ai-service ../ai-service
 ```
 
-`.env.example` の既定は SQLite です（開発では MySQL を使用。`.env` の `DB_*` を設定してください）。
+**準備**
 
 ```bash
 composer install && cp .env.example .env && php artisan key:generate
@@ -57,7 +80,9 @@ composer install && cp .env.example .env && php artisan key:generate
 php artisan migrate && php artisan storage:link
 ```
 
-次の 3 つのプロセスを起動します。
+`.env.example` はそのままだと SQLite を使います。MySQL を使う場合は `.env` の `DB_*` を設定してください（開発では MySQL を使っています）。
+
+**起動**: 次の 3 つを、それぞれ別のターミナルで起動します。
 
 ```bash
 php artisan serve
@@ -71,7 +96,9 @@ php artisan queue:work
 cd ../ai-service && ./venv/Scripts/python.exe -m uvicorn standard.api.main:app --port 8002
 ```
 
-http://127.0.0.1:8000 を開きます。ジョブのコードを変更したら `queue:work` を再起動してください（ワーカーは古いコードをメモリに保持し続けます）。
+ブラウザで http://127.0.0.1:8000 を開きます。
+
+`queue:work` は起動したときのコードを使い続けます。ジョブのコードを変えたら、`queue:work` を止めて起動し直してください。
 
 ## テスト
 
@@ -79,9 +106,10 @@ http://127.0.0.1:8000 を開きます。ジョブのコードを変更したら 
 php artisan test
 ```
 
-35 件、SQLite のインメモリ DB で実行します。`StandardPipelineEndToEndTest` は隣の `ai-service` から実際の `uvicorn` プロセスを起動し（セグメンテーションは偽のバックエンドを使うため、モデルのダウンロードは不要）、レスポンスが DB に保存されるまでを確認します。
+35 件のテストがあり、SQLite のメモリ上のデータベースで動きます。
+`StandardPipelineEndToEndTest` は、隣の `ai-service` で実際に API サーバーを起動し、処理結果がデータベースに保存されるまでを確認します（切り抜きはテスト用の簡易版を使うので、モデルのダウンロードは不要です）。
 
-## 残っている課題
+## まだできていないこと
 
-- REVIEW になった画像も、画面上は通常の完了と同じように表示されます。ステータス API は `review_required` を返していますが、画面側ではまだ使っていません。
-- メニュー表の PDF 出力（`/api/menu-boards/pdf`）は未実装で、準備中のメッセージを返すだけです。
+- **REVIEW の表示**: 確認が必要な画像も、画面では普通に完了した画像と同じように表示されます。API は `review_required` を返していますが、画面ではまだ使っていません。
+- **メニュー表の PDF 出力**: `/api/menu-boards/pdf` はまだ作っておらず、「準備中」のメッセージを返すだけです。
