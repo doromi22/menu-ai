@@ -9,9 +9,11 @@ use Illuminate\Support\Str;
 
 /**
  * Calls the Standard pipeline's own API (ai-service/standard/api/main.py,
- * §11 step 4) - a deliberately separate service from the existing
- * AiGenerationService/ProcessImageJob (Premium, GPU, Modal-hosted). See
+ * §11 step 4) - a deliberately separate service from ProcessImageJob's
+ * Premium engine (GPU, Modal-hosted). See
  * ai-service/docs/standard-api-contract.md for why they're kept apart.
+ * What the result means for the merchant lives in
+ * App\Domain\Image\ProcessingOutcome, not here.
  */
 class StandardAiService
 {
@@ -28,7 +30,7 @@ class StandardAiService
 
     public function __construct(?string $baseUrl = null)
     {
-        $this->baseUrl = rtrim($baseUrl ?? env('STANDARD_AI_SERVICE_URL', 'http://127.0.0.1:8002'), '/');
+        $this->baseUrl = rtrim($baseUrl ?? config('services.standard_ai.url'), '/');
     }
 
     /**
@@ -41,7 +43,7 @@ class StandardAiService
      *         failure (service unreachable, DNS, timeout) - distinct from a
      *         pipeline-level infra error, which comes back as an ordinary
      *         200 response with metadata.is_infra_error = true (see
-     *         userMessageFor()).
+     *         App\Domain\Image\ProcessingOutcome).
      * @throws \Illuminate\Http\Client\RequestException on a 4xx/5xx from
      *         the service itself (e.g. unreadable image, bad template_id).
      */
@@ -84,35 +86,12 @@ class StandardAiService
             $image->processed_path = $processedRelativePath;
             $image->status = 'completed'; // usable output per §7, even if validator_status is REVIEW
         } else {
-            $image->status = 'failed'; // §7 REJECT (incl. infra error) = "결과물 미사용" - nothing usable
+            $image->status = 'failed'; // §7 REJECT (incl. infra error): no usable output
         }
 
         $image->save();
 
         $image->syncReasons('segmentation', $metadata['segmentation_reasons']);
         $image->syncReasons('validator', $metadata['validator_reasons']);
-    }
-
-    /**
-     * Minimal user-facing message mapping (no UI yet - just the string a
-     * future UI would show). Kept here rather than in a view/component
-     * since it's a direct function of the API response, not presentation
-     * logic.
-     */
-    public function userMessageFor(array $metadata): string
-    {
-        if ($metadata['is_infra_error'] ?? false) {
-            return '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
-        }
-
-        if (($metadata['segmentation_status'] ?? null) === 'REJECT') {
-            return '이 사진은 지원되지 않습니다. 다른 사진으로 시도해주세요.';
-        }
-
-        if (($metadata['segmentation_status'] ?? null) === 'REVIEW' || ($metadata['validator_status'] ?? null) === 'REVIEW') {
-            return '검토가 필요한 이미지입니다. 확인 후 안내드리겠습니다.';
-        }
-
-        return '처리가 완료되었습니다.';
     }
 }

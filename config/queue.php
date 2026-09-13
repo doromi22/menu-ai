@@ -40,7 +40,9 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            // Longer than the slowest job's $timeout (ProcessImageJob, 180s),
+            // otherwise a still-running job is released and run a second time.
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 210),
             'after_commit' => false,
         ],
 

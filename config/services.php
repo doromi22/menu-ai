@@ -40,6 +40,14 @@ return [
     | 'standard' - CPU compositing pipeline (ai-service/standard, STANDARD_AI_SERVICE_URL)
     | 'premium'  - Modal-hosted generative engine (AI_SERVICE_URL, ProcessImageJob)
     */
+    'standard_ai' => [
+        'url' => env('STANDARD_AI_SERVICE_URL', 'http://127.0.0.1:8002'),
+    ],
+
+    'premium_ai' => [
+        'url' => env('AI_SERVICE_URL'),
+    ],
+
     'image_processing' => [
         'mode' => env('IMAGE_PROCESSING_MODE', 'standard'),
 

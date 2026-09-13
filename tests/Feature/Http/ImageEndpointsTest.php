@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Http;
 
+use App\Domain\Image\ProcessingOutcome;
 use App\Models\Image;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -44,6 +45,42 @@ class ImageEndpointsTest extends TestCase
 
         $this->assertDatabaseCount('images', 0);
         Queue::assertNothingPushed();
+    }
+
+    public function test_concurrent_spend_cannot_drive_credits_negative(): void
+    {
+        $user = User::factory()->create(['credits' => 1]);
+        // Another request spends the last credit after this request's user was loaded.
+        User::whereKey($user->id)->update(['credits' => 0]);
+
+        $this->actingAs($user) // stale model still says credits = 1
+            ->postJson('/api/images/upload', ['image' => UploadedFile::fake()->image('food.jpg')])
+            ->assertForbidden();
+
+        $this->assertSame(0, $user->fresh()->credits);
+        $this->assertDatabaseCount('images', 0);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_status_explains_the_outcome_to_the_merchant(): void
+    {
+        $user = User::factory()->create();
+        $review = Image::create([
+            'user_id' => $user->id, 'original_path' => 'images/original/r.jpg', 'processed_path' => 'images/processed/r.jpg',
+            'status' => 'completed', 'segmentation_status' => 'REVIEW', 'validator_status' => 'PASS', 'is_infra_error' => false,
+        ]);
+        $rejected = Image::create([
+            'user_id' => $user->id, 'original_path' => 'images/original/x.jpg',
+            'status' => 'failed', 'segmentation_status' => 'REJECT', 'is_infra_error' => false,
+        ]);
+
+        $this->actingAs($user)->getJson("/api/images/{$review->id}/status")
+            ->assertJsonPath('review_required', true)
+            ->assertJsonPath('message', ProcessingOutcome::MESSAGE_REVIEW);
+
+        $this->actingAs($user)->getJson("/api/images/{$rejected->id}/status")
+            ->assertJsonPath('review_required', false)
+            ->assertJsonPath('message', ProcessingOutcome::MESSAGE_UNSUPPORTED);
     }
 
     public function test_upload_rejects_non_images(): void

@@ -9,9 +9,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('images', function (Blueprint $table) {
-            // ai-service/docs/standard-metadata.schema.json 응답의 스칼라 필드.
-            // reason 배열(segmentation_reasons / validator_reasons)은
-            // image_processing_reasons pivot 테이블로 정규화.
+            // Scalar fields of the ai-service/docs/standard-metadata.schema.json response.
+            // The reason arrays (segmentation_reasons / validator_reasons) are
+            // normalized into the image_processing_reasons table.
             $table->string('pipeline_version')->nullable()->after('status');
             $table->string('policy_version')->nullable()->after('pipeline_version');
             $table->string('policy_hash')->nullable()->after('policy_version');

@@ -296,7 +296,7 @@
         let selectedPrompt = 'izakaya';
         let selectedAngle = '45';
 
-        // FingerprintJS 비동기 로드
+        // Load FingerprintJS asynchronously
         if (window.FingerprintJS) {
             FingerprintJS.load()
                 .then(fp => fp.get())
@@ -590,7 +590,7 @@
             const formData = new FormData();
             formData.append('image', selectedFile);
             formData.append('prompt', selectedPrompt);
-            formData.append('angle', selectedAngle); // 화각 매개변수 전송
+            formData.append('angle', selectedAngle); // not used by the Standard pipeline yet
 
             try {
                 const response = await fetch('/api/images/upload', {
@@ -643,7 +643,7 @@
                                 clearInterval(interval);
                                 processingOverlay.classList.add('hidden');
                                 processingOverlay.style.display = 'none';
-                                alert('画像の補正処理に失敗しました。');
+                                alert(statusData.message || '画像の補正処理に失敗しました。');
                             }
                         } catch (e) {
                             clearInterval(interval);

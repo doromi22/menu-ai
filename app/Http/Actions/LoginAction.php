@@ -2,13 +2,17 @@
 
 namespace App\Http\Actions;
 
-use App\Http\Controllers\Controller;
+use App\Http\Responders\LoginResponder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class LoginAction extends Controller
+class LoginAction
 {
+    public function __construct(private LoginResponder $responder)
+    {
+    }
+
     public function __invoke(Request $request): JsonResponse
     {
         $credentials = $request->validate([
@@ -16,19 +20,12 @@ class LoginAction extends Controller
             'password' => 'required',
         ]);
 
-        if (Auth::attempt($credentials, true)) {
-            $request->session()->regenerate();
-            $user = Auth::user();
-            return response()->json([
-                'message' => 'ログインしました。',
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'credits' => $user->credits,
-                ]
-            ]);
+        if (! Auth::attempt($credentials, remember: true)) {
+            return $this->responder->invalidCredentials();
         }
 
-        return response()->json(['message' => 'メールアドレスまたはパスワードが正しくありません。'], 401);
+        $request->session()->regenerate();
+
+        return $this->responder->loggedIn(Auth::user());
     }
 }

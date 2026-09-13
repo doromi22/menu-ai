@@ -9,22 +9,27 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+/**
+ * Premium engine (opt-in, IMAGE_PROCESSING_MODE=premium): the earlier
+ * generative pipeline hosted on Modal. It returns raw JPEG bytes and no
+ * integrity metadata, unlike ProcessStandardImageJob.
+ */
 class ProcessImageJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 180; // 클라우드 GPU 부팅 대기를 위해 타임아웃 180초 설정
+    // Allows for a cold GPU container on Modal. Must stay below the queue's
+    // retry_after (config/queue.php) or the job would be picked up twice.
+    public int $timeout = 180;
 
-    protected Image $image;
-    protected string $prompt;
-
-    public function __construct(Image $image, string $prompt = 'izakaya')
-    {
-        $this->image = $image;
-        $this->prompt = $prompt;
+    public function __construct(
+        protected Image $image,
+        protected string $prompt = 'izakaya',
+    ) {
     }
 
     public function handle(): void
@@ -32,44 +37,32 @@ class ProcessImageJob implements ShouldQueue
         $this->image->update(['status' => 'processing']);
 
         try {
-            $originalFullPath = Storage::disk('public')->path($this->image->original_path);
-            
-            // Modal 배포 URL (.env의 AI_SERVICE_URL)
-            $aiUrl = env('AI_SERVICE_URL');
-            if (!$aiUrl) {
+            $aiUrl = config('services.premium_ai.url');
+            if (! $aiUrl) {
                 throw new \RuntimeException('AI_SERVICE_URL is not configured');
             }
 
+            $originalFullPath = Storage::disk('public')->path($this->image->original_path);
             $response = Http::timeout(180)
                 ->attach('image', file_get_contents($originalFullPath), basename($originalFullPath))
-                ->post($aiUrl, [
-                    'prompt' => $this->prompt,
-                ]);
+                ->post($aiUrl, ['prompt' => $this->prompt]);
 
-            if (!$response->successful()) {
-                throw new \Exception('AI Engine API Error: ' . $response->body());
+            if (! $response->successful()) {
+                throw new \RuntimeException('AI Engine API Error: ' . $response->body());
             }
 
-            // 결과 이미지 저장
             $processedFilename = 'images/processed/' . Str::random(40) . '.jpg';
             Storage::disk('public')->put($processedFilename, $response->body());
 
-            // 완료 상태 업데이트
             $this->image->update([
                 'processed_path' => $processedFilename,
                 'status' => 'completed',
             ]);
-
         } catch (\Throwable $e) {
-            \Log::error('ProcessImageJob Failed: ' . $e->getMessage());
-            
-            // 실패 상태 업데이트
+            Log::error('ProcessImageJob Failed: ' . $e->getMessage());
+
             $this->image->update(['status' => 'failed']);
-            
-            // 실패 시 사용자 크레딧 1회 환불
-            if ($this->image->user) {
-                $this->image->user->increment('credits', 1);
-            }
+            $this->image->user?->increment('credits', 1);
         }
     }
 }

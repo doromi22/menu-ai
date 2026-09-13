@@ -10,10 +10,10 @@ return new class extends Migration
     {
         Schema::create('images', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade'); // 개발 초기 테스트를 위해 nullable 지정
-            $table->string('original_path');   // 원본 업로드 사진 경로
-            $table->string('processed_path')->nullable(); // AI 배경 합성 후 사진 경로
-            $table->string('prompt')->nullable();         // 합성 시 적용한 프롬프트
+            $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade'); // nullable: allowed user-less images during early development
+            $table->string('original_path');   // uploaded original photo
+            $table->string('processed_path')->nullable(); // processed result
+            $table->string('prompt')->nullable();         // background preset used for processing
             $table->enum('status', ['pending', 'processing', 'completed', 'failed'])->default('pending');
             $table->timestamps();
         });

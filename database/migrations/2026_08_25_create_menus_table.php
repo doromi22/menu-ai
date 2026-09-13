@@ -11,11 +11,11 @@ return new class extends Migration
         Schema::create('menus', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade');
-            $table->foreignId('image_id')->nullable()->constrained()->onDelete('set null'); // 합성 사진 매칭
-            $table->string('name');              // 메뉴 이름 (예: 특제 라멘)
-            $table->integer('price');            // 가격 (엔화 기준)
-            $table->text('description')->nullable(); // 메뉴 설명
-            $table->string('category')->nullable();   // 카테고리 (예: 메인, 음료)
+            $table->foreignId('image_id')->nullable()->constrained()->onDelete('set null'); // processed photo for this item
+            $table->string('name');              // e.g. "Special ramen"
+            $table->integer('price');            // JPY
+            $table->text('description')->nullable();
+            $table->string('category')->nullable();   // e.g. main, drink
             $table->timestamps();
         });
     }

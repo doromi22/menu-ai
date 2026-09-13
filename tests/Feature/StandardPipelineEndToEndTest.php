@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Image\ProcessingOutcome;
 use App\Models\Image;
 use App\Services\StandardAiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -117,7 +118,7 @@ class StandardPipelineEndToEndTest extends TestCase
         $this->assertSame(0, $image->segmentationReasons()->count());
         $this->assertSame(0, $image->validatorReasons()->count());
 
-        $this->assertSame('처리가 완료되었습니다.', $service->userMessageFor($body['metadata']));
+        $this->assertSame(ProcessingOutcome::MESSAGE_COMPLETED, ProcessingOutcome::messageFor($body['metadata']));
 
         @unlink($imagePath);
     }

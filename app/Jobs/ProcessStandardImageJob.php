@@ -22,7 +22,7 @@ class ProcessStandardImageJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     // StandardAiService's HTTP timeout is 60s; must stay under the queue's
-    // retry_after (config/queue.php, 90s) or the job gets picked up twice.
+    // retry_after (config/queue.php) or the job gets picked up twice.
     public int $timeout = 80;
 
     public function __construct(
