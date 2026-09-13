@@ -27,24 +27,11 @@ Domain は `Request` オブジェクトもレスポンスの形も扱わない�
 
 ## アップロードの流れ
 
-```mermaid
-sequenceDiagram
-    participant B as ブラウザ
-    participant L as Laravel
-    participant Q as キューワーカー
-    participant AI as ai-service (FastAPI)
-    B->>L: POST /api/images/upload（写真 + 背景プリセット）
-    L->>L: クレジットを 1 消費（原子的）、原本を保存、Image = pending
-    L->>Q: ProcessStandardImageJob(image, template_id)
-    L-->>B: 201 {id}
-    Q->>AI: POST /v1/standard/process
-    AI-->>Q: メタデータ（REJECT 以外は合成済み JPEG も）
-    Q->>L: メタデータ・理由コード・処理済み画像を保存
-    Note over Q,L: 使える画像がない場合（REJECT、インフラ障害、接続不可）は failed にしてクレジットを返却
-    loop 1 秒ごと
-        B->>L: GET /api/images/{id}/status
-    end
-```
+![アップロードの流れ: リクエストは Action → Domain → Responder、処理はキューワーカー → AI サービス → 結果保存。ブラウザは 1 秒ごとにステータスを確認](docs/images/architecture.svg)
+
+1. `POST /api/images/upload` を `UploadImageAction` が受け、`Domain\Image\UploadImage` がクレジットを 1 消費して原本を保存し、`ProcessStandardImageJob` を投入します。`UploadImageResponder` が 201 を返します。
+2. キューワーカーが `menu-ai-service` の `POST /v1/standard/process` を呼び、メタデータ・理由コード・処理済み画像を保存します。
+3. ブラウザは `GET /api/images/{id}/status` を 1 秒ごとに確認します。
 
 - **クレジット消費**は「残高 1 以上なら減らす」を 1 つの UPDATE で行うため、同時に 2 件アップロードしても残高がマイナスになりません。
 - **返却ルール**: REVIEW は画像が返るため返却しません。

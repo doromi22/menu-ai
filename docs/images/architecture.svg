@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="100%" height="100%">
+  <defs>
+    <!-- Arrowhead markers -->
+    <marker id="arrow-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 1 2 L 8 5 L 1 8" fill="none" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+    </marker>
+    <marker id="arrow-indigo" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 1 2 L 8 5 L 1 8" fill="none" stroke="#4F46E5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1600" height="900" fill="#FFFFFF" />
+
+  <!-- ================= ROW LABELS ================= -->
+  <text x="75" y="285" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#94A3B8" letter-spacing="1">Request</text>
+  <text x="75" y="585" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#94A3B8" letter-spacing="1">Background</text>
+
+  <!-- ================= TOP ROW CONNECTING ARROWS ================= -->
+  <!-- Browser -> Action -->
+  <line x1="280" y1="280" x2="352" y2="280" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arrow-gray)" />
+
+  <!-- Action -> Domain -->
+  <line x1="560" y1="280" x2="622" y2="280" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arrow-gray)" />
+
+  <!-- Domain -> Responder -->
+  <line x1="1025" y1="280" x2="1087" y2="280" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arrow-gray)" />
+
+  <!-- Responder -> Browser (Loopback 201) -->
+  <path d="M 1195 230 C 1195 130, 220 130, 220 220" fill="none" stroke="#4F46E5" stroke-width="1.5" marker-end="url(#arrow-indigo)" />
+  <rect x="678" y="142" width="60" height="26" rx="4" fill="#FFFFFF" />
+  <text x="708" y="160" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#4F46E5">201</text>
+
+  <!-- ================= BOTTOM ROW CONNECTING ARROWS ================= -->
+  <!-- Queue Worker -> AI Service -->
+  <line x1="885" y1="580" x2="947" y2="580" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arrow-gray)" />
+
+  <!-- AI Service -> Save Result -->
+  <line x1="1170" y1="580" x2="1232" y2="580" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arrow-gray)" />
+
+  <!-- ================= INTER-ROW CONNECTIONS ================= -->
+  <!-- Domain DOWN to Queue Worker -->
+  <line x1="795" y1="330" x2="795" y2="520" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arrow-gray)" />
+
+  <!-- Browser DOWN to Save Result (poll /status every 1s) -->
+  <path d="M 220 330 C 220 740, 1375 740, 1375 640" fill="none" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="6 6" marker-end="url(#arrow-gray)" />
+  <rect x="688" y="663" width="220" height="26" rx="4" fill="#FFFFFF" />
+  <text x="798" y="681" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="13" font-weight="500" fill="#64748B">poll /status every 1s</text>
+
+  <!-- ================= TOP ROW BOXES ================= -->
+  <!-- 1. Browser -->
+  <rect x="160" y="230" width="120" height="100" rx="8" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5" />
+  <text x="220" y="287" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="16" font-weight="600" fill="#475569">Browser</text>
+
+  <!-- 2. Action -->
+  <rect x="360" y="230" width="200" height="100" rx="10" fill="#EEF2FF" stroke="#4F46E5" stroke-width="1.5" />
+  <text x="460" y="272" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="16" font-weight="600" fill="#1E293B">Action</text>
+  <text x="460" y="298" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="12" font-weight="500" fill="#4F46E5">validate input</text>
+
+  <!-- 3. Domain -->
+  <rect x="630" y="230" width="395" height="100" rx="10" fill="#EEF2FF" stroke="#4F46E5" stroke-width="1.5" />
+  <text x="827" y="272" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="16" font-weight="600" fill="#1E293B">Domain</text>
+  <text x="827" y="298" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="12" font-weight="500" fill="#4F46E5">spend 1 credit · store photo · queue job</text>
+
+  <!-- 4. Responder -->
+  <rect x="1095" y="230" width="200" height="100" rx="10" fill="#EEF2FF" stroke="#4F46E5" stroke-width="1.5" />
+  <text x="1195" y="272" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="16" font-weight="600" fill="#1E293B">Responder</text>
+  <text x="1195" y="298" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="12" font-weight="500" fill="#4F46E5">JSON response</text>
+
+  <!-- ================= BOTTOM ROW BOXES ================= -->
+  <!-- 5. Queue Worker -->
+  <rect x="705" y="530" width="180" height="100" rx="10" fill="#EEF2FF" stroke="#4F46E5" stroke-width="1.5" />
+  <text x="795" y="587" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="16" font-weight="600" fill="#1E293B">Queue Worker</text>
+
+  <!-- 6. AI Service -->
+  <rect x="955" y="530" width="215" height="100" rx="10" fill="#EEF2FF" stroke="#4F46E5" stroke-width="1.5" />
+  <text x="1062" y="572" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="16" font-weight="600" fill="#1E293B">AI Service</text>
+  <text x="1062" y="598" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="12" font-weight="500" fill="#4F46E5">menu-ai-service</text>
+
+  <!-- 7. Save Result -->
+  <rect x="1240" y="530" width="270" height="100" rx="10" fill="#EEF2FF" stroke="#4F46E5" stroke-width="1.5" />
+  <text x="1375" y="572" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="16" font-weight="600" fill="#1E293B">Save Result</text>
+  <text x="1375" y="598" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="12" font-weight="500" fill="#4F46E5">status · reason codes</text>
+
+  <!-- Note above Save Result (the polling arrow enters from below) -->
+  <text x="1375" y="514" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="12" font-weight="500" fill="#94A3B8">No usable image → refund credit</text>
+</svg>
