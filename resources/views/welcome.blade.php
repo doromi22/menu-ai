@@ -73,8 +73,8 @@
             <div class="p-4 rounded-xl bg-indigo-950/30 border border-indigo-500/20 flex gap-3 items-start">
                 <i data-lucide="shield-check" class="w-5 h-5 text-indigo-400 shrink-0 mt-0.5"></i>
                 <div class="text-xs text-zinc-300 leading-relaxed">
-                    <strong class="text-indigo-300 font-medium">景品表示法対応:</strong> 
-                    お料理の形状・ボリュームは100%保持し、背景と器の質感・光沢のみを自然に差し替えます。
+                    <strong class="text-indigo-300 font-medium">景品表示法対応:</strong>
+                    お料理そのものは生成・加工せず、背景・影・色味だけを整えます。
                 </div>
             </div>
 
@@ -179,12 +179,21 @@
 
             </div>
 
+            <!-- Review notice: shown when the pipeline marked the result REVIEW -->
+            <div id="reviewNotice" style="display: none" class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 gap-3 items-start" role="status">
+                <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-400 shrink-0 mt-0.5"></i>
+                <div>
+                    <p class="text-sm font-semibold text-amber-300">確認が必要な画像です</p>
+                    <p id="reviewNoticeText" class="text-xs text-amber-100/80 mt-0.5 leading-relaxed"></p>
+                </div>
+            </div>
+
             <!-- Download Single High-Res Button -->
             <div id="downloadContainer" class="hidden transition-all duration-500 transform translate-y-2 opacity-0">
-                <a id="downloadBtn" href="#" download="menu-ai-processed.png" target="_blank"
+                <a id="downloadBtn" href="#" download="menu-ai-processed.jpg" target="_blank"
                    class="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-emerald-500/90 to-teal-600/90 hover:from-emerald-500 hover:to-teal-600 border border-emerald-400/30 text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 backdrop-blur-md transition duration-200">
                     <i data-lucide="download" class="w-5 h-5"></i>
-                    <span>高解像度画像をダウンロード (PNG)</span>
+                    <span>高解像度画像をダウンロード (JPEG)</span>
                 </a>
             </div>
 
@@ -333,6 +342,18 @@
         const historyGrid = document.getElementById('historyGrid');
         const historyEmptyText = document.getElementById('historyEmptyText');
         const refreshHistoryBtn = document.getElementById('refreshHistoryBtn');
+        const reviewNotice = document.getElementById('reviewNotice');
+        const reviewNoticeText = document.getElementById('reviewNoticeText');
+        const REVIEW_FALLBACK_MESSAGE = '仕上がりの確認をおすすめします。気になる点がないかご確認ください。';
+
+        function showReviewNotice(message) {
+            reviewNoticeText.innerText = message || REVIEW_FALLBACK_MESSAGE;
+            reviewNotice.style.display = 'flex';
+        }
+
+        function hideReviewNotice() {
+            reviewNotice.style.display = 'none';
+        }
 
         // Modal Open / Close
         openAuthModalBtn.addEventListener('click', (e) => {
@@ -426,6 +447,7 @@
                         item.className = "w-20 h-20 shrink-0 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-indigo-500 overflow-hidden cursor-pointer relative group transition-all duration-200 hover:scale-105";
                         item.innerHTML = `
                             <img src="${targetUrl}" class="w-full h-full object-cover">
+                            ${img.review_required ? '<span class="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-amber-400 text-[9px] font-bold text-black">要確認</span>' : ''}
                             <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
                                 <i data-lucide="eye" class="w-4 h-4 text-white"></i>
                             </div>
@@ -436,10 +458,11 @@
                             previewActive.classList.remove('hidden');
                             previewActive.style.display = 'flex';
                             resultImage.src = targetUrl;
+                            img.review_required ? showReviewNotice(null) : hideReviewNotice();
 
                             if (img.processed_url) {
                                 downloadBtn.href = img.processed_url;
-                                downloadBtn.download = `menu_ai_${img.id}.png`;
+                                downloadBtn.download = `menu_ai_${img.id}.jpg`;
                                 downloadContainer.classList.remove('hidden', 'opacity-0', 'translate-y-2');
                                 downloadContainer.classList.add('opacity-100', 'translate-y-0');
                             }
@@ -524,7 +547,8 @@
             selectedFile = file;
             fileStatus.innerText = file.name;
             fileStatus.classList.add('text-indigo-400', 'font-medium');
-            
+            hideReviewNotice();
+
             downloadContainer.classList.add('hidden', 'opacity-0', 'translate-y-2');
             downloadContainer.classList.remove('opacity-100', 'translate-y-0');
 
@@ -583,6 +607,7 @@
 
             downloadContainer.classList.add('hidden', 'opacity-0', 'translate-y-2');
             downloadContainer.classList.remove('opacity-100', 'translate-y-0');
+            hideReviewNotice();
 
             processingOverlay.classList.remove('hidden');
             processingOverlay.style.display = 'flex';
@@ -625,7 +650,8 @@
                                 resultImage.src = finalUrl;
 
                                 downloadBtn.href = finalUrl;
-                                downloadBtn.download = `menu_ai_${imageId}.png`;
+                                downloadBtn.download = `menu_ai_${imageId}.jpg`;
+                                statusData.review_required ? showReviewNotice(statusData.message) : hideReviewNotice();
 
                                 processingOverlay.classList.add('hidden');
                                 processingOverlay.style.display = 'none';

@@ -16,7 +16,7 @@ class ProcessingOutcome
 
     public const MESSAGE_UNSUPPORTED = 'この写真には対応していません。別の写真でお試しください。';
 
-    public const MESSAGE_REVIEW = '確認が必要な画像です。確認後にご案内します。';
+    public const MESSAGE_REVIEW = '仕上がりの確認をおすすめします。料理が写真の端にかかっているなど、気になる点がないかご確認ください。';
 
     public const MESSAGE_COMPLETED = '処理が完了しました。';
 

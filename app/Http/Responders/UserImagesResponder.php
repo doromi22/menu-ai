@@ -11,8 +11,9 @@ class UserImagesResponder
 {
     /**
      * @param  Collection<int, Image>  $images
+     * @param  array<int, bool>  $reviewRequired  keyed by image id
      */
-    public function respond(Collection $images): JsonResponse
+    public function respond(Collection $images, array $reviewRequired): JsonResponse
     {
         return response()->json([
             'images' => $images->map(fn (Image $image) => [
@@ -20,6 +21,7 @@ class UserImagesResponder
                 'status' => $image->status,
                 'original_url' => ImagePayload::originalUrl($image),
                 'processed_url' => ImagePayload::processedUrl($image),
+                'review_required' => $reviewRequired[$image->id] ?? false,
                 'created_at' => $image->created_at->format('Y/m/d H:i'),
             ]),
         ]);

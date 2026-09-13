@@ -163,6 +163,25 @@ class ImageEndpointsTest extends TestCase
             ->assertJsonStructure(['images' => [['id', 'status', 'original_url', 'processed_url', 'created_at']]]);
     }
 
+    public function test_image_list_flags_images_that_need_review(): void
+    {
+        $user = User::factory()->create();
+        $review = Image::create([
+            'user_id' => $user->id, 'original_path' => 'images/original/r.jpg', 'processed_path' => 'images/processed/r.jpg',
+            'status' => 'completed', 'segmentation_status' => 'REVIEW', 'validator_status' => 'PASS',
+        ]);
+        $clean = Image::create([
+            'user_id' => $user->id, 'original_path' => 'images/original/c.jpg', 'processed_path' => 'images/processed/c.jpg',
+            'status' => 'completed', 'segmentation_status' => 'PASS', 'validator_status' => 'PASS',
+        ]);
+
+        $this->actingAs($user)->getJson('/api/images')
+            ->assertJsonPath('images.0.id', $clean->id)
+            ->assertJsonPath('images.0.review_required', false)
+            ->assertJsonPath('images.1.id', $review->id)
+            ->assertJsonPath('images.1.review_required', true);
+    }
+
     public function test_menu_board_pdf_is_a_placeholder(): void
     {
         $this->getJson('/api/menu-boards/pdf')->assertOk()->assertJsonStructure(['message']);

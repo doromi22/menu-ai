@@ -3,7 +3,9 @@
 namespace App\Http\Actions;
 
 use App\Domain\Image\ListUserImages;
+use App\Domain\Image\ProcessingOutcome;
 use App\Http\Responders\UserImagesResponder;
+use App\Models\Image;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 
@@ -21,6 +23,11 @@ class GetUserImagesAction
             return $this->responder->unauthenticated();
         }
 
-        return $this->responder->respond($this->listUserImages->handle($user));
+        $images = $this->listUserImages->handle($user);
+        $reviewRequired = $images
+            ->mapWithKeys(fn (Image $image) => [$image->id => ProcessingOutcome::imageRequiresReview($image)])
+            ->all();
+
+        return $this->responder->respond($images, $reviewRequired);
     }
 }
