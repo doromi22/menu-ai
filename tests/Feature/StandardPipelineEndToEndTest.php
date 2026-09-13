@@ -34,8 +34,8 @@ class StandardPipelineEndToEndTest extends TestCase
     {
         parent::setUpBeforeClass();
 
-        $aiServiceDir = realpath(__DIR__ . '/../../../ai-service');
-        $python = $aiServiceDir . DIRECTORY_SEPARATOR . 'venv' . DIRECTORY_SEPARATOR . 'Scripts' . DIRECTORY_SEPARATOR . 'python.exe';
+        $aiServiceDir = realpath(__DIR__.'/../../../ai-service');
+        $python = $aiServiceDir.DIRECTORY_SEPARATOR.'venv'.DIRECTORY_SEPARATOR.'Scripts'.DIRECTORY_SEPARATOR.'python.exe';
 
         self::$serverProcess = new Process(
             [$python, '-m', 'uvicorn', 'standard.api.main:app', '--port', (string) self::PORT],
@@ -62,12 +62,12 @@ class StandardPipelineEndToEndTest extends TestCase
     private static function waitUntilHealthy(): void
     {
         $deadline = microtime(true) + 30;
-        $url = 'http://127.0.0.1:' . self::PORT . '/health';
+        $url = 'http://127.0.0.1:'.self::PORT.'/health';
 
         while (microtime(true) < $deadline) {
             if (self::$serverProcess->isTerminated()) {
                 throw new \RuntimeException(
-                    "Standard API server exited before becoming healthy:\n" . self::$serverProcess->getErrorOutput()
+                    "Standard API server exited before becoming healthy:\n".self::$serverProcess->getErrorOutput()
                 );
             }
 
@@ -87,7 +87,7 @@ class StandardPipelineEndToEndTest extends TestCase
         }
 
         throw new \RuntimeException(
-            "Standard API server (uvicorn) did not become healthy within 30s\n" . self::$serverProcess->getErrorOutput()
+            "Standard API server (uvicorn) did not become healthy within 30s\n".self::$serverProcess->getErrorOutput()
         );
     }
 
@@ -102,7 +102,7 @@ class StandardPipelineEndToEndTest extends TestCase
             'status' => 'processing',
         ]);
 
-        $service = new StandardAiService('http://127.0.0.1:' . self::PORT);
+        $service = new StandardAiService('http://127.0.0.1:'.self::PORT);
         $body = $service->process($image, $imagePath);
 
         $image->refresh();
@@ -127,7 +127,7 @@ class StandardPipelineEndToEndTest extends TestCase
     {
         // background (230,230,230) + a distinct food-colored block -
         // matches standard/api/main.py's _FakeThresholdBackend logic.
-        $path = tempnam(sys_get_temp_dir(), 'e2e_food') . '.jpg';
+        $path = tempnam(sys_get_temp_dir(), 'e2e_food').'.jpg';
 
         $gd = imagecreatetruecolor(120, 120);
         imagefilledrectangle($gd, 0, 0, 119, 119, imagecolorallocate($gd, 230, 230, 230));

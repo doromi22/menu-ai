@@ -8,9 +8,7 @@ use Illuminate\Support\Facades\Auth;
 
 class MeAction
 {
-    public function __construct(private MeResponder $responder)
-    {
-    }
+    public function __construct(private MeResponder $responder) {}
 
     public function __invoke(): JsonResponse
     {

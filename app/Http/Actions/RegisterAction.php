@@ -14,8 +14,7 @@ class RegisterAction
     public function __construct(
         private RegisterUser $registerUser,
         private RegisterResponder $responder,
-    ) {
-    }
+    ) {}
 
     public function __invoke(Request $request): JsonResponse
     {

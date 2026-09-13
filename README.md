@@ -1,50 +1,66 @@
-# MenuAI - web app
+# MenuAI - Web アプリ
 
-Merchant-facing web app for MenuAI: a restaurant uploads a phone photo of a
-dish and gets back a clean menu image on a styled background. This
-repository is the Laravel side (accounts, credits, upload, queue, status
-polling). The image processing itself - segmentation, compositing,
-integrity validation - lives in the separate **`ai-service`** repository,
-whose README covers the engine, the real-photo findings and before/after
-images.
+MenuAI の加盟店向け Web アプリです。飲食店が料理の写真をアップロードすると、背景を整えたメニュー用画像が返ってきます。
+このリポジトリは Laravel 側（アカウント、クレジット、アップロード、キュー、ステータス確認）です。セグメンテーション・合成・整合性検証といった画像処理本体は別リポジトリ [`menu-ai-service`](https://github.com/doromi22/menu-ai-service) にあり、エンジンの設計、実写真で見つかった問題、修正前後の比較画像はそちらの README にまとめています。
 
-## How an upload flows
+## 設計: Action-Domain-Responder（ADR）
+
+HTTP 層は MVC のコントローラではなく ADR パターンで構成しています。エンドポイント 1 つにつき Action 1 つで、責務を 3 層に分けています。
+
+```
+app/
+  Http/
+    Actions/        HTTP の入力だけを扱う（バリデーション、認証状態、ルートモデル）。業務ロジックは持たない
+    Responders/     JSON レスポンスの組み立てだけを扱う。ユーザー・画像の形は Payloads/ に集約
+  Domain/
+    Auth/           RegisterUser: 使い捨てメールの拒否、無料クレジットの付与条件（不正登録対策）
+    Image/          UploadImage: クレジット消費・原本保存・処理エンジンへの投入
+                    ListUserImages / ProcessingOutcome: 処理結果が加盟店にとって何を意味するか
+  Services/         StandardAiService: ai-service への HTTP 呼び出しと結果の保存（インフラ）
+  Jobs/             ProcessStandardImageJob（既定）/ ProcessImageJob（Premium）
+```
+
+例えばアップロードでは、`UploadImageAction` がリクエストを検証し、`Domain\Image\UploadImage` がクレジットを消費してジョブを投入し、`UploadImageResponder` がレスポンスを返します。
+Domain は `Request` オブジェクトもレスポンスの形も扱わないため、業務ルールを HTTP を経由せずに呼び出してテストできます（例: `tests/Unit/ProcessingOutcomeTest.php`）。
+
+リファクタリングの前に、既存エンドポイントのステータスコードと JSON の形を固定する characterization テストを先に追加し、構造変更の後も同じテストが通ることを確認しています。
+
+## アップロードの流れ
 
 ```mermaid
 sequenceDiagram
-    participant B as Browser
+    participant B as ブラウザ
     participant L as Laravel
-    participant Q as Queue worker
+    participant Q as キューワーカー
     participant AI as ai-service (FastAPI)
-    B->>L: POST /api/images/upload (photo + background preset)
-    L->>L: check & deduct 1 credit, store original, Image = pending
+    B->>L: POST /api/images/upload（写真 + 背景プリセット）
+    L->>L: クレジットを 1 消費（原子的）、原本を保存、Image = pending
     L->>Q: ProcessStandardImageJob(image, template_id)
     L-->>B: 201 {id}
     Q->>AI: POST /v1/standard/process
-    AI-->>Q: metadata (+ rendered JPEG unless REJECT)
-    Q->>L: persist metadata, reason codes, processed image
-    Note over Q,L: no usable image (REJECT, infra error, unreachable) -> status failed + credit refunded
-    loop every second
+    AI-->>Q: メタデータ（REJECT 以外は合成済み JPEG も）
+    Q->>L: メタデータ・理由コード・処理済み画像を保存
+    Note over Q,L: 使える画像がない場合（REJECT、インフラ障害、接続不可）は failed にしてクレジットを返却
+    loop 1 秒ごと
         B->>L: GET /api/images/{id}/status
     end
 ```
 
-- **`app/Jobs/ProcessStandardImageJob.php`** - queue lifecycle and refund
-  rule. REVIEW still returns an image, so it is not refunded.
-- **`app/Services/StandardAiService.php`** - the HTTP call and persistence.
-  Pipeline metadata (policy hash, PASS/REVIEW/REJECT per stage,
-  `is_infra_error`, retry count) goes onto `images`; reason codes go into
-  `image_processing_reasons`, one row per code, so REVIEW volume can be
-  queried by reason.
-- **`config/services.php` -> `image_processing`** - which engine uploads go
-  to (`standard` by default, `premium` = the earlier Modal-hosted generative
-  engine via `ProcessImageJob`) and the UI preset -> template mapping.
+- **クレジット消費**は「残高 1 以上なら減らす」を 1 つの UPDATE で行うため、同時に 2 件アップロードしても残高がマイナスになりません。
+- **返却ルール**: REVIEW は画像が返るため返却しません。
+- **保存するメタデータ**: ポリシーハッシュ、段階ごとの PASS/REVIEW/REJECT、`is_infra_error`、再試行回数を `images` に保存し、理由コードは 1 コード 1 行で `image_processing_reasons` に保存します。これにより、REVIEW がどの理由で多いかを集計できます。
+- **ステータス API** は `review_required` と、加盟店向けの日本語メッセージ（`Domain\Image\ProcessingOutcome`）を返します。インフラ障害は必ず「一時的なエラー」として扱い、「この写真には対応していません」と誤って伝えないようにしています。
+- **`config/services.php`** の `image_processing` で、アップロード先のエンジン（既定は `standard`、`premium` は Modal 上の旧生成モデル方式）と、画面のプリセットとテンプレートの対応を設定します。
 
-## Running locally
+## ローカルでの実行
 
-Needs PHP 8.3+, Composer, and `ai-service` running on port 8002.
-`.env.example` defaults to SQLite; development used MySQL (set the `DB_*`
-values in `.env`).
+PHP 8.3 以上、Composer、ポート 8002 で動いている AI サービスが必要です。AI サービスはこのリポジトリの隣に `ai-service` という名前で配置します（エンドツーエンドテストがこのパスを参照します）。
+
+```bash
+git clone https://github.com/doromi22/menu-ai-service ../ai-service
+```
+
+`.env.example` の既定は SQLite です（開発では MySQL を使用。`.env` の `DB_*` を設定してください）。
 
 ```bash
 composer install && cp .env.example .env && php artisan key:generate
@@ -54,7 +70,7 @@ composer install && cp .env.example .env && php artisan key:generate
 php artisan migrate && php artisan storage:link
 ```
 
-Then three processes:
+次の 3 つのプロセスを起動します。
 
 ```bash
 php artisan serve
@@ -68,23 +84,17 @@ php artisan queue:work
 cd ../ai-service && ./venv/Scripts/python.exe -m uvicorn standard.api.main:app --port 8002
 ```
 
-Open http://127.0.0.1:8000. Restart `queue:work` after changing job code - the
-worker keeps the old code in memory.
+http://127.0.0.1:8000 を開きます。ジョブのコードを変更したら `queue:work` を再起動してください（ワーカーは古いコードをメモリに保持し続けます）。
 
-## Tests
+## テスト
 
 ```bash
 php artisan test
 ```
 
-14 tests, SQLite in-memory. `StandardPipelineEndToEndTest` starts a real
-`uvicorn` process from the sibling `ai-service` checkout (with a fake
-segmentation backend, so no model download) and checks a response lands in
-the database.
+35 件、SQLite のインメモリ DB で実行します。`StandardPipelineEndToEndTest` は隣の `ai-service` から実際の `uvicorn` プロセスを起動し（セグメンテーションは偽のバックエンドを使うため、モデルのダウンロードは不要）、レスポンスが DB に保存されるまでを確認します。
 
-## Known gaps
+## 残っている課題
 
-- REVIEW results are shown like any completed image; the UI has no "needs
-  review" state yet.
-- `StandardAiService::userMessageFor()` returns Korean messages while the UI
-  is Japanese, so those messages are not surfaced in the UI yet.
+- REVIEW になった画像も、画面上は通常の完了と同じように表示されます。ステータス API は `review_required` を返していますが、画面側ではまだ使っていません。
+- メニュー表の PDF 出力（`/api/menu-boards/pdf`）は未実装で、準備中のメッセージを返すだけです。

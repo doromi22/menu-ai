@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Image;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -39,13 +41,13 @@ class StandardAiService
      * pivot rows, §11-2's storage decision). Returns the decoded response
      * body in case the caller wants more than what got persisted.
      *
-     * @throws \Illuminate\Http\Client\ConnectionException on a transport-level
-     *         failure (service unreachable, DNS, timeout) - distinct from a
-     *         pipeline-level infra error, which comes back as an ordinary
-     *         200 response with metadata.is_infra_error = true (see
-     *         App\Domain\Image\ProcessingOutcome).
-     * @throws \Illuminate\Http\Client\RequestException on a 4xx/5xx from
-     *         the service itself (e.g. unreadable image, bad template_id).
+     * @throws ConnectionException on a transport-level
+     *                             failure (service unreachable, DNS, timeout) - distinct from a
+     *                             pipeline-level infra error, which comes back as an ordinary
+     *                             200 response with metadata.is_infra_error = true (see
+     *                             App\Domain\Image\ProcessingOutcome).
+     * @throws RequestException on a 4xx/5xx from
+     *                          the service itself (e.g. unreadable image, bad template_id).
      */
     public function process(Image $image, string $originalFullPath, ?string $templateId = null): array
     {
@@ -81,7 +83,7 @@ class StandardAiService
         ]);
 
         if (isset($body['image']['data'])) {
-            $processedRelativePath = 'images/processed/' . Str::random(40) . '.jpg';
+            $processedRelativePath = 'images/processed/'.Str::random(40).'.jpg';
             Storage::disk('public')->put($processedRelativePath, base64_decode($body['image']['data']));
             $image->processed_path = $processedRelativePath;
             $image->status = 'completed'; // usable output per §7, even if validator_status is REVIEW

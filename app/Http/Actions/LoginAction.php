@@ -9,9 +9,7 @@ use Illuminate\Support\Facades\Auth;
 
 class LoginAction
 {
-    public function __construct(private LoginResponder $responder)
-    {
-    }
+    public function __construct(private LoginResponder $responder) {}
 
     public function __invoke(Request $request): JsonResponse
     {

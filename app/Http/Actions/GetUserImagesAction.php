@@ -12,8 +12,7 @@ class GetUserImagesAction
     public function __construct(
         private ListUserImages $listUserImages,
         private UserImagesResponder $responder,
-    ) {
-    }
+    ) {}
 
     public function __invoke(): JsonResponse
     {

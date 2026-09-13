@@ -7,7 +7,6 @@ use App\Jobs\ProcessStandardImageJob;
 use App\Models\Image;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Spends one credit, stores the original and queues processing on the
@@ -27,7 +26,7 @@ class UploadImage
         // separate "credits >= 1" read and drive the balance negative.
         $spent = User::whereKey($user->getKey())->where('credits', '>=', 1)->decrement('credits');
         if ($spent === 0) {
-            throw new InsufficientCreditsException();
+            throw new InsufficientCreditsException;
         }
         $user->refresh();
 

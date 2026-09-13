@@ -10,9 +10,7 @@ use Illuminate\Http\JsonResponse;
  */
 class GenerateMenuPdfAction
 {
-    public function __construct(private GenerateMenuPdfResponder $responder)
-    {
-    }
+    public function __construct(private GenerateMenuPdfResponder $responder) {}
 
     public function __invoke(): JsonResponse
     {

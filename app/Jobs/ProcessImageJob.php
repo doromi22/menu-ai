@@ -29,8 +29,7 @@ class ProcessImageJob implements ShouldQueue
     public function __construct(
         protected Image $image,
         protected string $prompt = 'izakaya',
-    ) {
-    }
+    ) {}
 
     public function handle(): void
     {
@@ -48,10 +47,10 @@ class ProcessImageJob implements ShouldQueue
                 ->post($aiUrl, ['prompt' => $this->prompt]);
 
             if (! $response->successful()) {
-                throw new \RuntimeException('AI Engine API Error: ' . $response->body());
+                throw new \RuntimeException('AI Engine API Error: '.$response->body());
             }
 
-            $processedFilename = 'images/processed/' . Str::random(40) . '.jpg';
+            $processedFilename = 'images/processed/'.Str::random(40).'.jpg';
             Storage::disk('public')->put($processedFilename, $response->body());
 
             $this->image->update([
@@ -59,7 +58,7 @@ class ProcessImageJob implements ShouldQueue
                 'status' => 'completed',
             ]);
         } catch (\Throwable $e) {
-            Log::error('ProcessImageJob Failed: ' . $e->getMessage());
+            Log::error('ProcessImageJob Failed: '.$e->getMessage());
 
             $this->image->update(['status' => 'failed']);
             $this->image->user?->increment('credits', 1);

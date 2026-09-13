@@ -59,6 +59,11 @@ class ProcessingOutcome
             || ($metadata['validator_status'] ?? null) === 'REVIEW';
     }
 
+    public static function imageRequiresReview(Image $image): bool
+    {
+        return self::requiresReview(self::metadataOf($image));
+    }
+
     private static function metadataOf(Image $image): array
     {
         return [

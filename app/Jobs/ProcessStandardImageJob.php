@@ -28,8 +28,7 @@ class ProcessStandardImageJob implements ShouldQueue
     public function __construct(
         public Image $image,
         public ?string $templateId = null,
-    ) {
-    }
+    ) {}
 
     public function handle(StandardAiService $service): void
     {
@@ -39,7 +38,7 @@ class ProcessStandardImageJob implements ShouldQueue
             $originalFullPath = Storage::disk('public')->path($this->image->original_path);
             $service->process($this->image, $originalFullPath, $this->templateId);
         } catch (\Throwable $e) {
-            Log::error('ProcessStandardImageJob Failed: ' . $e->getMessage());
+            Log::error('ProcessStandardImageJob Failed: '.$e->getMessage());
             $this->image->update(['status' => 'failed']);
         }
 

@@ -9,9 +9,7 @@ use Illuminate\Support\Facades\Auth;
 
 class LogoutAction
 {
-    public function __construct(private LogoutResponder $responder)
-    {
-    }
+    public function __construct(private LogoutResponder $responder) {}
 
     public function __invoke(Request $request): JsonResponse
     {

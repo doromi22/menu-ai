@@ -14,8 +14,7 @@ class UploadImageAction
     public function __construct(
         private UploadImage $uploadImage,
         private UploadImageResponder $responder,
-    ) {
-    }
+    ) {}
 
     public function __invoke(Request $request): JsonResponse
     {
