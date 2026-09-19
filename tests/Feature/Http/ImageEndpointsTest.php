@@ -47,10 +47,17 @@ class ImageEndpointsTest extends TestCase
         Queue::assertNothingPushed();
     }
 
-    public function test_concurrent_spend_cannot_drive_credits_negative(): void
+    /**
+     * Pins that the spend decides on the database balance, not on the User the
+     * request already holds in memory. It stages no real race — the competing
+     * write lands before the request starts — so a version that reads fresh and
+     * then decrements in a second statement passes this too; that window needs
+     * concurrent connections to observe.
+     */
+    public function test_upload_is_refused_when_the_in_memory_balance_is_stale(): void
     {
         $user = User::factory()->create(['credits' => 1]);
-        // Another request spends the last credit after this request's user was loaded.
+        // Another request spent the last credit after this request's user was loaded.
         User::whereKey($user->id)->update(['credits' => 0]);
 
         $this->actingAs($user) // stale model still says credits = 1
